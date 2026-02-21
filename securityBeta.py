@@ -68,7 +68,7 @@ def start_capture(interface):
                 continue
     except Exception as e:
         st.error(f"Error en la captura: {e}")
-interface_name = 'bridge0' 
+interface_name = 'en0' 
 if 'thread_started' not in st.session_state:
     thread = threading.Thread(target=start_capture, args=(interface_name,), daemon=True)
     thread.start()
