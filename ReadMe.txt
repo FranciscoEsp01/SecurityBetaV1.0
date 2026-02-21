@@ -18,7 +18,6 @@ REQUISITOS:
 -----------
 * Python 3.x instalado.
 * TShark (Motor de Wireshark): Indispensable para capturar paquetes.
-  - En macOS: brew install wireshark
 * Librerías de Python:
   - streamlit
   - pandas
