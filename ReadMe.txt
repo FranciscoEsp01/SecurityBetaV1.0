@@ -46,5 +46,4 @@ USO:
 esta se puede encontrar con los siguientes comandos:
 
 1. networksetup -listallhardwareports
-
 2. ifconfig | grep "inet " | grep -v 127.0.0.1
