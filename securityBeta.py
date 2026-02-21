@@ -13,7 +13,7 @@ import os
 # registro de fecha y hora:  21/02/2025 04:21 AM
 
 st.set_page_config(page_title="SecurityBeta", layout="wide")
-st.title("🛡️ Monitor de Ciberseguridad en Tiempo Real")
+st.title("Monitor de Ciberseguridad en Tiempo Real")
 
 if 'log_data' not in st.session_state:
     st.session_state.log_data = pd.DataFrame(columns=[
@@ -68,7 +68,7 @@ def start_capture(interface):
                 continue
     except Exception as e:
         st.error(f"Error en la captura: {e}")
-interface_name = 'en0' 
+interface_name = 'bridge0' 
 if 'thread_started' not in st.session_state:
     thread = threading.Thread(target=start_capture, args=(interface_name,), daemon=True)
     thread.start()
@@ -84,20 +84,20 @@ st.divider()
 col_table, col_charts = st.columns([2, 1])
 
 with col_table:
-    st.subheader("📋 Registro de Logs (Tiempo Real)")
+    st.subheader("Registro de Logs en tiempo real")
 
     st.dataframe(
         st.session_state.log_data.sort_index(ascending=False), 
-        use_container_width=True,
+        width="stretch",
         height=400
     )
 
 with col_charts:
-    st.subheader("📊 Análisis de Tráfico")
+    st.subheader("Análisis de Tráfico")
     if not st.session_state.log_data.empty:
         # Grafico 1 Clasificacion de uso
         fig_pie = px.pie(st.session_state.log_data, names='Tipo', title="Uso de Red", hole=0.3)
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, width="stretch")
         
         # Grafico 2 IPs mas activas
         fig_bar = px.bar(
@@ -106,6 +106,6 @@ with col_charts:
             title="Top 5 IPs Origen",
             labels={'value': 'Paquetes', 'index': 'IP'}
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width="stretch")
 time.sleep(1.5)
 st.rerun()
