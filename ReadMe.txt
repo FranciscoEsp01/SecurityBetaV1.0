@@ -30,13 +30,16 @@ Ejecute los siguientes comandos en terminal para instalar los módulos necesario
 
 1. python3 -m pip install streamlit plotly pyshark pandas
 2. brew install wireshark (para macOS) o apt-get install wireshark (para Linux)
+3. recordar entrar desde la terminal a la carpeta donde este guardado el proyecto
+         ejemplo: cd Documets securitybeta
 
 USO:
 ----
  En la terminal ejecutar el siguiente comando:
 
-1. streamlit run securityBeta.py
-2. sudo python3 -m streamlit run securityBeta.py
+1. sudo tshark -i en0 -c 5
+2. streamlit run securityBeta.py
+3. (en caso de que no funcione el comando anterior) sudo python3 -m streamlit run securityBeta.py
 
  Esto abrirá la pagina en tu navegador web.
 
