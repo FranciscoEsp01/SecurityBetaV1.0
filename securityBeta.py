@@ -15,7 +15,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 
 # V1.1 2: Se corrigio el problema con los permisos de streamlit
 # al final era un prblema dentro de la terminal la cual no permitia el uso correcto de streamlit
-#se reestructuro la mayoria del codigo para mejorar la captura de paquetes
+# se reestructuro la mayoria del codigo para mejorar la captura de paquetes
 # registro de fecha y hora:  8/03/2026 17:45 PM
 
 st.set_page_config(page_title="CyberScan Pro", layout="wide")
