@@ -35,7 +35,7 @@ Ejecute los siguientes comandos en terminal para instalar los módulos necesario
 
 USO:
 ----
- En la terminal ejecutar el siguiente comando:
+ En la terminal ejecutar los siguientes comandos:
 
 1. sudo tshark -i en0 -c 5
 2. streamlit run securityBeta.py
