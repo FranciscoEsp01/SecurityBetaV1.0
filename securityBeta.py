@@ -14,12 +14,17 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # registro de fecha y hora:  21/02/2026 04:21 AM
 
 # V1.1 2: Se corrigio el problema con los permisos de streamlit
-# al final era un prblema dentro de la terminal la cual no permitia el uso correcto de streamlit
+# al final era un prblema dentro de la terminal la cual no permitia el uso correcto de astreamlit
 # se reestructuro la mayoria del codigo para mejorar la captura de paquetes
 # registro de fecha y hora:  8/03/2026 17:45 PM
 
-st.set_page_config(page_title="SecurityBeta Prototype", layout="wide")
-st.title(" Monitor de Ciberseguridad en Tiempo Real")
+# V1.2 2: se organizo mejor la UI y se agrego el registro para poder ver las capturas por IP unica
+# ademas tambien se aumento la cantidad de paquetes que se pueden mostrar en el log a 1000 para evitar problemas de rendimiento
+# tengo ideado aumentar la cantidad de paquetes que se pueden mostrar en el log a 2000 pero puede que la capacidad de memoria de streamlit no permita eso
+# registro de fecha y hora:  09/03/2026 13:45 PM
+
+st.set_page_config(page_title="CyberScan Pro", layout="wide", page_icon="🛡️")
+st.title("🛡️ Monitor de Ciberseguridad en Tiempo Real")
 
 if 'log_data' not in st.session_state:
     st.session_state.log_data = pd.DataFrame(columns=[
@@ -67,12 +72,12 @@ def start_capture(interface):
                 new_df = pd.DataFrame([new_row])
                 st.session_state.log_data = pd.concat([st.session_state.log_data, new_df], ignore_index=True)
 
-                if len(st.session_state.log_data) > 100:
-                    st.session_state.log_data = st.session_state.log_data.tail(100)
+                if len(st.session_state.log_data) > 1000:
+                    st.session_state.log_data = st.session_state.log_data.tail(1000)
             except (AttributeError, Exception):
                 continue
-    except Exception as e:
-        print(f"Error en captura: {e}")
+    except Exception:
+        pass
 
 interface_name = 'en0' 
 
@@ -81,6 +86,7 @@ if 'thread_started' not in st.session_state:
     add_script_run_ctx(thread)
     thread.start()
     st.session_state.thread_started = True
+
 if not st.session_state.log_data.empty:
     m1, m2, m3 = st.columns(3)
     m1.metric("Paquetes Capturados", len(st.session_state.log_data))
@@ -89,22 +95,45 @@ if not st.session_state.log_data.empty:
 
 st.divider()
 
-col_table, col_charts = st.columns([2, 1])
+tab1, tab2 = st.tabs(["🌐 Dashboard General", "🔍 Análisis por IP Única"])
 
-with col_table:
-    st.subheader(" Registro de Logs")
-    st.dataframe(
-        st.session_state.log_data.iloc[::-1], 
-        width="stretch",
-        height=450
-    )
+with tab1:
+    col_charts, col_table = st.columns([1, 2])
+    
+    with col_charts:
+        st.subheader("📊 Gráficos de Tráfico")
+        if not st.session_state.log_data.empty:
+            fig_pie = px.pie(st.session_state.log_data, names='Tipo', hole=0.3)
+            fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+            st.plotly_chart(fig_pie, width="stretch")
+            
+            top_ips = st.session_state.log_data['Origen'].value_counts().head(5).reset_index()
+            top_ips.columns = ['IP', 'Paquetes']
+            fig_bar = px.bar(top_ips, x='Paquetes', y='IP', orientation='h')
+            fig_bar.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+            st.plotly_chart(fig_bar, width="stretch")
 
-with col_charts:
-    st.subheader("📊 Análisis")
+    with col_table:
+        st.subheader("📋 Registro Completo")
+        st.dataframe(
+            st.session_state.log_data.iloc[::-1], 
+            width="stretch",
+            height=500
+        )
+
+with tab2:
+    st.subheader("🔎 Rastreo de Actividad por IP")
     if not st.session_state.log_data.empty:
-        fig_pie = px.pie(st.session_state.log_data, names='Tipo', hole=0.3)
-        st.plotly_chart(fig_pie, width="stretch")
-        top_ips = st.session_state.log_data['Origen'].value_counts().head(5)
-        st.bar_chart(top_ips)
-time.sleep(2)
+        unique_ips = st.session_state.log_data['Origen'].unique()
+        for ip in unique_ips:
+            with st.expander(f"📍 Acciones de la IP: {ip}"):
+                filtered_data = st.session_state.log_data[st.session_state.log_data['Origen'] == ip]
+                st.dataframe(
+                    filtered_data.iloc[::-1],
+                    width="stretch"
+                )
+    else:
+        st.info("Esperando captura de paquetes...")
+
+time.sleep(4)
 st.rerun()
