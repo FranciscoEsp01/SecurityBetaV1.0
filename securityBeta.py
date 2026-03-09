@@ -18,7 +18,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # se reestructuro la mayoria del codigo para mejorar la captura de paquetes
 # registro de fecha y hora:  8/03/2026 17:45 PM
 
-st.set_page_config(page_title="CyberScan Pro", layout="wide")
+st.set_page_config(page_title="SecurityBeta Prototype", layout="wide")
 st.title(" Monitor de Ciberseguridad en Tiempo Real")
 
 if 'log_data' not in st.session_state:
