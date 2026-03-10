@@ -23,8 +23,12 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # tengo ideado aumentar la cantidad de paquetes que se pueden mostrar en el log a 2000 pero puede que la capacidad de memoria de streamlit no permita eso
 # registro de fecha y hora:  09/03/2026 13:45 PM
 
-st.set_page_config(page_title="CyberScan Pro", layout="wide", page_icon="🛡️")
-st.title("🛡️ Monitor de Ciberseguridad en Tiempo Real")
+# V1.3 2: se agrego el grafico de actividad en el tiempo, se corrigio el problema de registro de paquetes, pero el sistema se queda sin memoria y crashea despues de cierto tiempo
+#no se como arreglarlo, pero quizas se podria eliminar el registro de paquetes y utilizar una proxy para que no se utilize la memoria del sistema
+# registro de fecha y hora:  10/03/2026 12:21 PM
+
+st.set_page_config(page_title="SecurityBeta Prototype", layout="wide", page_icon="🛡️")
+st.title(" Monitor de Ciberseguridad en Tiempo Real")
 
 if 'log_data' not in st.session_state:
     st.session_state.log_data = pd.DataFrame(columns=[
@@ -72,8 +76,6 @@ def start_capture(interface):
                 new_df = pd.DataFrame([new_row])
                 st.session_state.log_data = pd.concat([st.session_state.log_data, new_df], ignore_index=True)
 
-                if len(st.session_state.log_data) > 1000:
-                    st.session_state.log_data = st.session_state.log_data.tail(1000)
             except (AttributeError, Exception):
                 continue
     except Exception:
@@ -98,6 +100,18 @@ st.divider()
 tab1, tab2 = st.tabs(["🌐 Dashboard General", "🔍 Análisis por IP Única"])
 
 with tab1:
+    if not st.session_state.log_data.empty:
+        st.subheader("📈 Actividad en el Tiempo (por Hora)")
+        df_time = st.session_state.log_data.copy()
+        df_time['Hora'] = pd.to_datetime(df_time['Timestamp'], format='%H:%M:%S').dt.strftime('%H:00')
+        time_counts = df_time.groupby('Hora').size().reset_index(name='Acciones')
+        
+        fig_line = px.line(time_counts, x='Hora', y='Acciones', markers=True, color_discrete_sequence=['#FF00FF'])
+        fig_line.update_layout(margin=dict(t=20, b=20, l=0, r=0), xaxis_title="Hora", yaxis_title="Cantidad de Registros")
+        st.plotly_chart(fig_line, width="stretch")
+        
+    st.divider()
+
     col_charts, col_table = st.columns([1, 2])
     
     with col_charts:
