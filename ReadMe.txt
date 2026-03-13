@@ -23,6 +23,7 @@ REQUISITOS:
   - pandas
   - pyshark
   - plotly
+  - auth_key (URLhaus) (se consigue en el siguiente link = https://auth.abuse.ch/user/me)
 
 INSTALACION:
 ------------
