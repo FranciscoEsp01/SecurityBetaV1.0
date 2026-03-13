@@ -33,6 +33,7 @@ Ejecute los siguientes comandos en terminal para instalar los módulos necesario
 2. brew install wireshark (para macOS) o apt-get install wireshark (para Linux)
 3. recordar entrar desde la terminal a la carpeta donde este guardado el proyecto
          ejemplo: cd Documets securitybeta
+4. ingresar la llave de autenticación para la base de datos de URLhaus dentro del codigo.
 
 USO:
 ----
