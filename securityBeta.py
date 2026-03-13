@@ -25,12 +25,12 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # registro de fecha y hora:  09/03/2026 13:45 PM
 
 # V1.3 2: se agrego el grafico de actividad en el tiempo, se corrigio el problema de registro de paquetes, pero el sistema se queda sin memoria y crashea despues de cierto tiempo
-#no se como arreglarlo, pero quizas se podria eliminar el registro de paquetes y utilizar una proxy para que no se utilize la memoria del sistema
+# no se como arreglarlo, pero quizas se podria eliminar el registro de paquetes y utilizar una proxy para que no se utilize la memoria del sistema
 # registro de fecha y hora:  10/03/2026 12:21 PM
 
 # V1.4 2: se agrego la base de datos de amenazas recientes de URLhaus, esta no funciona (no genera conexion con la API), no se como solucionarlo pero algo se me ocurrira mas adelante
-#elimine la key de la API de URLhaus por seguridad, pero esto hace que la base de datos no se pueda cargar, se necesita una key para poder acceder a la API, si alguien quiere probarlo solo tiene que obtener una key gratuita en el sitio de URLhaus y agregarla
-#en versiones superiores quisiera cambiar de UI posiblemente filament o algo asi, pero por ahora streamlit es lo que mejor se adapta a mis necesidades
+# elimine la key de la API de URLhaus por seguridad, pero esto hace que la base de datos no se pueda cargar, se necesita una key para poder acceder a la API, si alguien quiere probarlo solo tiene que obtener una key gratuita en el sitio de URLhaus y agregarla
+# en versiones superiores quisiera cambiar de UI posiblemente filament o algo asi, pero por ahora streamlit es lo que mejor se adapta a mis necesidades
 # registro de fecha y hora:  13/03/2026 12:15 PM
 
 st.set_page_config(page_title="SecurityBeta Prototype", layout="wide", page_icon="🛡️")
