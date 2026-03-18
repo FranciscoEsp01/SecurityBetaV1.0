@@ -8,6 +8,7 @@ import plotly.express as px
 from datetime import datetime
 import asyncio
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+import ssl
 
 # V1.0 2: inicio de la version beta de Pagina de Monitoreo de Ciberseguridad
 # la pagina funciona pero no registra los logs ni se muestran graficos ya que no se capturan
@@ -25,7 +26,7 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # registro de fecha y hora:  09/03/2026 13:45 PM
 
 # V1.3 2: se agrego el grafico de actividad en el tiempo, se corrigio el problema de registro de paquetes, pero el sistema se queda sin memoria y crashea despues de cierto tiempo
-# no se como arreglarlo, pero quizas se podria eliminar el registro de paquetes y utilizar una proxy para que no se utilize la memoria del sistema
+#no se como arreglarlo, pero quizas se podria eliminar el registro de paquetes y utilizar una proxy para que no se utilize la memoria del sistema
 # registro de fecha y hora:  10/03/2026 12:21 PM
 
 # V1.4 2: se agrego la base de datos de amenazas recientes de URLhaus, esta no funciona (no genera conexion con la API), no se como solucionarlo pero algo se me ocurrira mas adelante
@@ -33,8 +34,18 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx
 # en versiones superiores quisiera cambiar de UI posiblemente filament o algo asi, pero por ahora streamlit es lo que mejor se adapta a mis necesidades
 # registro de fecha y hora:  13/03/2026 12:15 PM
 
+# V1.5 2: se corrigio el problema que habia con la base de datos de URLhaus, ya genenra conexion con la API y se puede cargar la base de datos
+# la API de URLhaus no aparecera en el repositorio por seguridad, pero si alguien quiere probarlo solo tiene que obtener una key gratuita en el sitio de URLhaus y agregarla en la funcion load_urlhaus_db()
+# tambien se corrigio un error que hacia que la pagina colapsara, basicamente lo que sucedia era la certificacion de python ante los archivos capturados con HTTPS
+# tambien se corrigio un problema con la ID de URLhaus, se agrego un espacio "no verificado" para que el script corra sin problemas
+# registro de fecha y hora:  18/03/2026 11:35 PM
+
+
+
+ssl._create_default_https_context = ssl._create_unverified_context
+
 st.set_page_config(page_title="SecurityBeta Prototype", layout="wide", page_icon="🛡️")
-st.title(" Monitor de Ciberseguridad en Tiempo Real")
+st.title("🛡️ Monitor de Ciberseguridad en Tiempo Real")
 
 if 'log_data' not in st.session_state:
     st.session_state.log_data = pd.DataFrame(columns=[
@@ -46,14 +57,18 @@ urlhaus_cache = {}
 @st.cache_data(ttl=3600)
 def load_urlhaus_db():
     try:
-        url = "https://urlhaus-api.abuse.ch/files/exports/recent.csv?"
+        url = "https://urlhaus-api.abuse.ch/files/exports/recent.csv?auth-key="
         df = pd.read_csv(url, skiprows=8)
-        df = df.rename(columns=lambda x: str(x).strip().replace('"', ''))
-        if 'url' in df.columns:
-            return df[['id', 'dateadded', 'url', 'threat', 'reporter']].head(500)
-        return df.head(500)
-    except Exception:
-        return pd.DataFrame()
+        df.columns = df.columns.str.strip().str.replace('"', '').str.replace('# ', '')
+        
+        columnas_deseadas = ['id', 'dateadded', 'url', 'threat', 'reporter']
+        columnas_disponibles = [col for col in columnas_deseadas if col in df.columns]
+        
+        if columnas_disponibles:
+            return df[columnas_disponibles].head(500), None
+        return df.head(500), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 def check_urlhaus(host):
     if not host:
@@ -61,7 +76,7 @@ def check_urlhaus(host):
     if host in urlhaus_cache:
         return urlhaus_cache[host]
     try:
-        response = requests.post("https://urlhaus-api.abuse.ch/v1/host/", data={'host': host}, timeout=2)
+        response = requests.post("https://urlhaus-api.abuse.ch/v1/host/", data={'host': host}, timeout=2, verify=False)
         if response.status_code == 200:
             is_malicious = response.json().get('query_status') == 'ok'
             urlhaus_cache[host] = is_malicious
@@ -150,13 +165,15 @@ if 'thread_started' not in st.session_state:
     thread.start()
     st.session_state.thread_started = True
 
-if not st.session_state.log_data.empty:
+df_snapshot = st.session_state.log_data.copy()
+
+if not df_snapshot.empty:
     m1, m2, m3 = st.columns(3)
-    m1.metric("Paquetes Capturados", len(st.session_state.log_data))
-    m2.metric("IPs Únicas", st.session_state.log_data['Origen'].nunique())
+    m1.metric("Paquetes Capturados", len(df_snapshot))
+    m2.metric("IPs Únicas", df_snapshot['Origen'].nunique())
     
-    riesgos = st.session_state.log_data['Riesgo'].fillna('')
-    m3.metric("Alertas de Riesgo", len(st.session_state.log_data[riesgos.str.contains("Medio|Crítico")]))
+    alertas = df_snapshot['Riesgo'].fillna('').str.contains("Medio|Crítico").sum()
+    m3.metric("Alertas de Riesgo", int(alertas))
 
 st.divider()
 
@@ -165,12 +182,14 @@ tab1, tab2, tab3 = st.tabs(["🌐 Dashboard General", "🔍 Análisis por IP Ún
 def row_style(row):
     if 'Crítico' in str(row['Riesgo']):
         return ['background-color: rgba(255, 75, 75, 0.3)'] * len(row)
+    elif 'Medio' in str(row['Riesgo']):
+        return ['background-color: rgba(255, 165, 0, 0.3)'] * len(row)
     return [''] * len(row)
 
 with tab1:
-    if not st.session_state.log_data.empty:
+    if not df_snapshot.empty:
         st.subheader("📈 Actividad en el Tiempo (por Hora)")
-        df_time = st.session_state.log_data.copy()
+        df_time = df_snapshot.copy()
         df_time['Hora'] = pd.to_datetime(df_time['Timestamp'], format='%H:%M:%S').dt.strftime('%H:00')
         time_counts = df_time.groupby('Hora').size().reset_index(name='Acciones')
         
@@ -184,12 +203,12 @@ with tab1:
     
     with col_charts:
         st.subheader("📊 Gráficos de Tráfico")
-        if not st.session_state.log_data.empty:
-            fig_pie = px.pie(st.session_state.log_data, names='Tipo', hole=0.3)
+        if not df_snapshot.empty:
+            fig_pie = px.pie(df_snapshot, names='Tipo', hole=0.3)
             fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, width="stretch")
             
-            top_ips = st.session_state.log_data['Origen'].value_counts().head(5).reset_index()
+            top_ips = df_snapshot['Origen'].value_counts().head(5).reset_index()
             top_ips.columns = ['IP', 'Paquetes']
             fig_bar = px.bar(top_ips, x='Paquetes', y='IP', orientation='h')
             fig_bar.update_layout(margin=dict(t=0, b=0, l=0, r=0))
@@ -197,26 +216,37 @@ with tab1:
 
     with col_table:
         st.subheader("📋 Registro Completo")
-        if not st.session_state.log_data.empty:
-            styled_df = st.session_state.log_data.iloc[::-1].style.apply(row_style, axis=1)
+        if not df_snapshot.empty:
+            styled_df = df_snapshot.iloc[::-1].style.apply(row_style, axis=1)
             st.dataframe(styled_df, width="stretch", height=500)
         else:
-            st.dataframe(st.session_state.log_data, width="stretch", height=500)
+            st.dataframe(df_snapshot, width="stretch", height=500)
 
 with tab2:
     st.subheader("🔎 Rastreo de Actividad por IP")
-    if not st.session_state.log_data.empty:
-        unique_ips = st.session_state.log_data['Origen'].unique()
+    if not df_snapshot.empty:
+        riesgos_mask = df_snapshot['Riesgo'].fillna('')
+        malicious_ips = df_snapshot[riesgos_mask.str.contains('Crítico')]['Origen'].unique()
+        medium_ips = df_snapshot[riesgos_mask.str.contains('Medio')]['Origen'].unique()
+        all_ips = df_snapshot['Origen'].unique()
         
-        riesgos_mask = st.session_state.log_data['Riesgo'].fillna('')
-        malicious_ips = st.session_state.log_data[riesgos_mask.str.contains('Crítico')]['Origen'].unique()
+        ips_ordenadas = list(malicious_ips)
+        ips_ordenadas.extend([ip for ip in medium_ips if ip not in ips_ordenadas])
+        ips_ordenadas.extend([ip for ip in all_ips if ip not in ips_ordenadas])
         
-        for ip in unique_ips:
+        for ip in ips_ordenadas:
             is_malicious = ip in malicious_ips
-            expander_label = f"🔴 Acciones de la IP: {ip} (RIESGO CRÍTICO DETECTADO)" if is_malicious else f"📍 Acciones de la IP: {ip}"
+            is_medium = ip in medium_ips
+            
+            if is_malicious:
+                expander_label = f"🔴 Acciones de la IP: {ip} (RIESGO CRÍTICO DETECTADO)"
+            elif is_medium:
+                expander_label = f"🟠 Acciones de la IP: {ip} (RIESGO MEDIO)"
+            else:
+                expander_label = f"📍 Acciones de la IP: {ip}"
             
             with st.expander(expander_label):
-                filtered_data = st.session_state.log_data[st.session_state.log_data['Origen'] == ip]
+                filtered_data = df_snapshot[df_snapshot['Origen'] == ip]
                 styled_filtered_df = filtered_data.iloc[::-1].style.apply(row_style, axis=1)
                 st.dataframe(styled_filtered_df, width="stretch")
     else:
@@ -224,11 +254,14 @@ with tab2:
 
 with tab3:
     st.subheader("🦠 Base de Datos de Amenazas Recientes (URLhaus)")
-    df_urlhaus = load_urlhaus_db()
+    df_urlhaus, error_msg = load_urlhaus_db()
     if not df_urlhaus.empty:
         st.dataframe(df_urlhaus, width="stretch", height=600)
     else:
-        st.warning("Cargando datos de URLhaus o no hay conexión disponible...")
+        if error_msg:
+            st.error(f"Error detectado: {error_msg}")
+        else:
+            st.warning("Cargando datos de URLhaus o no hay conexión disponible...")
 
 time.sleep(4)
 st.rerun()
