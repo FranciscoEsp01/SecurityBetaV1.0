@@ -41,6 +41,7 @@ import ssl
 # V1.6 2: se simplifico la UI para que sea mas facil de usar, se agrego la opcion de descargar el registro en formato CSV, se corrigio el problema de rendimiento que habia con la cantidad de paquetes mostrados en el log, ahora se pueden mostrar hasta 5 millones de paquetes sin que el sistema se quede sin memoria
 # voy a buscar asesoria sobre el tema de ARP spoofing para la captura de paquetes de red y que tan legal y factible es esto, tambien quiero comparar los beneficios y los contras de este ultimo y un "modo monitor"
 # el codigo ya esta bastante avanzado y funcionando en los casos de prueba que estoy haceiendo pero a largo plazo no se como mejorarlo y mejorar la experiencia de usuario
+# tambien se añadio un boton de descarga en CSV para poder descargar los registros y estos sean pasados a un excel
 # registro de fecha y hora:  18/03/2026 22:10 PM
 
 pd.set_option("styler.render.max_elements", 5000000)
