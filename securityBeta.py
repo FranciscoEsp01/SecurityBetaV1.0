@@ -36,16 +36,21 @@ import ssl
 
 # V1.5 2: se corrigio el problema que habia con la base de datos de URLhaus, ya genenra conexion con la API y se puede cargar la base de datos
 # la API de URLhaus no aparecera en el repositorio por seguridad, pero si alguien quiere probarlo solo tiene que obtener una key gratuita en el sitio de URLhaus y agregarla en la funcion load_urlhaus_db()
-# tambien se corrigio un error que hacia que la pagina colapsara, basicamente lo que sucedia era la certificacion de python ante los archivos capturados con HTTPS
-# tambien se corrigio un problema con la ID de URLhaus, se agrego un espacio "no verificado" para que el script corra sin problemas
 # registro de fecha y hora:  18/03/2026 11:35 PM
 
+# V1.6 2: se simplifico la UI para que sea mas facil de usar, se agrego la opcion de descargar el registro en formato CSV, se corrigio el problema de rendimiento que habia con la cantidad de paquetes mostrados en el log, ahora se pueden mostrar hasta 5 millones de paquetes sin que el sistema se quede sin memoria
+# voy a buscar asesoria sobre el tema de ARP spoofing para la captura de paquetes de red y que tan legal y factible es esto, tambien quiero comparar los beneficios y los contras de este ultimo y un "modo monitor"
+# el codigo ya esta bastante avanzado y funcionando en los casos de prueba que estoy haceiendo pero a largo plazo no se como mejorarlo y mejorar la experiencia de usuario
+# registro de fecha y hora:  18/03/2026 22:10 PM
 
+pd.set_option("styler.render.max_elements", 5000000)
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-st.set_page_config(page_title="SecurityBeta Prototype", layout="wide", page_icon="🛡️")
-st.title("🛡️ Monitor de Ciberseguridad en Tiempo Real")
+st.set_page_config(page_title="SecurityBeta prototype", layout="wide", page_icon="🛡️")
+
+st.title("🛡️ Monitor de Seguridad de Red")
+st.markdown("Vigilancia en tiempo real de tu conexión a internet, diseñada de forma clara y fácil de entender.")
 
 if 'log_data' not in st.session_state:
     st.session_state.log_data = pd.DataFrame(columns=[
@@ -89,37 +94,37 @@ def check_urlhaus(host):
 def classify_threat(packet):
     try:
         proto = packet.highest_layer
-        risk = "Bajo"
-        usage = "Sistema/Basura"
+        risk = "Seguro"
+        usage = "Tráfico Interno/Sistema"
 
         if proto in ['HTTP', 'TLS', 'TCP', 'QUIC']:
-            usage = "Navegación Web"
+            usage = "Navegación en Internet"
         elif proto in ['DNS', 'MDNS', 'SSDP']:
-            usage = "Servicios de Red"
+            usage = "Servicios Automáticos"
         
         if 'TCP' in packet and hasattr(packet.tcp, 'flags_syn') and packet.tcp.flags_syn == '1':
             if hasattr(packet.tcp, 'flags_ack') and packet.tcp.flags_ack == '0':
-                risk = "Medio (SYN Scan?)"
+                risk = "Precaución (Posible Escaneo)"
         
         return usage, risk
     except:
-        return "Desconocido", "Bajo"
+        return "Desconocido", "Seguro"
 
 def get_packet_details(packet):
-    detalle = "Sin detalles"
+    detalle = "Sin detalles técnicos"
     host = None
     try:
         if hasattr(packet, 'http') and hasattr(packet.http, 'host'):
             host = packet.http.host
-            detalle = f"Sitio Web: {host}"
+            detalle = f"Página web: {host}"
         elif hasattr(packet, 'tls') and hasattr(packet.tls, 'handshake_extensions_server_name'):
             host = packet.tls.handshake_extensions_server_name
-            detalle = f"Sitio (HTTPS): {host}"
+            detalle = f"Sitio seguro: {host}"
         elif hasattr(packet, 'dns') and hasattr(packet.dns, 'qry_name'):
             host = packet.dns.qry_name
-            detalle = f"Consulta DNS: {host}"
+            detalle = f"Búsqueda: {host}"
         elif hasattr(packet, 'mdns') and hasattr(packet.mdns, 'dns_qry_name'):
-            detalle = f"Descubrimiento: {packet.mdns.dns_qry_name}"
+            detalle = f"Dispositivo local: {packet.mdns.dns_qry_name}"
     except Exception:
         pass
     return detalle, host
@@ -136,7 +141,7 @@ def start_capture(interface):
                 detalle, host = get_packet_details(packet)
                 
                 if host and check_urlhaus(host):
-                    risk = "Crítico (URLhaus Malicioso)"
+                    risk = "Peligro (Sitio Malicioso Bloqueado)"
                     usage = "Amenaza Detectada"
                 
                 new_row = {
@@ -167,101 +172,144 @@ if 'thread_started' not in st.session_state:
 
 df_snapshot = st.session_state.log_data.copy()
 
+# Barra lateral para herramientas
+with st.sidebar:
+    st.header("⚙️ Herramientas")
+    st.markdown("Descarga todo el registro para analizarlo en Excel o compartirlo.")
+    if not df_snapshot.empty:
+        csv = df_snapshot.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="💾 Descargar CSV",
+            data=csv,
+            file_name=f"Reporte_Red_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime='text/csv'
+        )
+    else:
+        st.info("Aún no hay datos capturados.")
+
 if not df_snapshot.empty:
+    st.markdown("### 📊 Estado General de tu Red")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Paquetes Capturados", len(df_snapshot))
-    m2.metric("IPs Únicas", df_snapshot['Origen'].nunique())
+    m1.metric("🌐 Conexiones Totales", len(df_snapshot))
+    m2.metric("📱 Dispositivos Activos", df_snapshot['Origen'].nunique())
     
-    alertas = df_snapshot['Riesgo'].fillna('').str.contains("Medio|Crítico").sum()
-    m3.metric("Alertas de Riesgo", int(alertas))
+    alertas = df_snapshot['Riesgo'].fillna('').str.contains("Precaución|Peligro").sum()
+    m3.metric("⚠️ Alertas de Seguridad", int(alertas))
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["🌐 Dashboard General", "🔍 Análisis por IP Única", "🦠 Base de Datos URLhaus"])
+tab1, tab2, tab3 = st.tabs(["🏠 Vista Principal", "🔍 Revisar Dispositivos", "🦠 Lista de Amenazas Globales"])
 
 def row_style(row):
-    if 'Crítico' in str(row['Riesgo']):
+    if 'Peligro' in str(row['Riesgo']):
         return ['background-color: rgba(255, 75, 75, 0.3)'] * len(row)
-    elif 'Medio' in str(row['Riesgo']):
+    elif 'Precaución' in str(row['Riesgo']):
         return ['background-color: rgba(255, 165, 0, 0.3)'] * len(row)
     return [''] * len(row)
 
 with tab1:
     if not df_snapshot.empty:
-        st.subheader("📈 Actividad en el Tiempo (por Hora)")
-        df_time = df_snapshot.copy()
-        df_time['Hora'] = pd.to_datetime(df_time['Timestamp'], format='%H:%M:%S').dt.strftime('%H:00')
-        time_counts = df_time.groupby('Hora').size().reset_index(name='Acciones')
+        # Fila Superior: Relación 60/40
+        top_col1, top_col2 = st.columns([6, 4])
         
-        fig_line = px.line(time_counts, x='Hora', y='Acciones', markers=True, color_discrete_sequence=['#FF00FF'])
-        fig_line.update_layout(margin=dict(t=20, b=20, l=0, r=0), xaxis_title="Hora", yaxis_title="Cantidad de Acciones")
-        st.plotly_chart(fig_line, width="stretch")
-        
-    st.divider()
-
-    col_charts, col_table = st.columns([1, 2])
-    
-    with col_charts:
-        st.subheader("📊 Gráficos de Tráfico")
-        if not df_snapshot.empty:
-            fig_pie = px.pie(df_snapshot, names='Tipo', hole=0.3)
-            fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig_pie, width="stretch")
+        with top_col1:
+            st.markdown("#### 📈 Actividad Reciente")
+            df_time = df_snapshot.copy()
+            df_time['Hora'] = pd.to_datetime(df_time['Timestamp'], format='%H:%M:%S').dt.strftime('%H:00')
+            time_counts = df_time.groupby('Hora').size().reset_index(name='Conexiones')
             
+            fig_line = px.line(time_counts, x='Hora', y='Conexiones', markers=True, color_discrete_sequence=['#4CAF50'])
+            fig_line.update_layout(margin=dict(t=20, b=20, l=0, r=0), xaxis_title="Hora del día", yaxis_title="Cantidad de Tráfico")
+            st.plotly_chart(fig_line, width="stretch")
+            
+        with top_col2:
+            st.markdown("#### 🧩 ¿Para qué se usa el internet?")
+            fig_pie = px.pie(df_snapshot, names='Tipo', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_pie.update_layout(margin=dict(t=20, b=20, l=0, r=0))
+            st.plotly_chart(fig_pie, width="stretch")
+
+        st.divider()
+
+        # Fila Inferior: Relación 30/70
+        bot_col1, bot_col2 = st.columns([3, 7])
+
+        with bot_col1:
+            st.markdown("#### 🏆 Top Dispositivos")
             top_ips = df_snapshot['Origen'].value_counts().head(5).reset_index()
-            top_ips.columns = ['IP', 'Paquetes']
-            fig_bar = px.bar(top_ips, x='Paquetes', y='IP', orientation='h')
-            fig_bar.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+            top_ips.columns = ['Dirección IP', 'Conexiones']
+            fig_bar = px.bar(top_ips, x='Conexiones', y='Dirección IP', orientation='h', color_discrete_sequence=['#2196F3'])
+            fig_bar.update_layout(margin=dict(t=20, b=20, l=0, r=0))
             st.plotly_chart(fig_bar, width="stretch")
 
-    with col_table:
-        st.subheader("📋 Registro Completo")
-        if not df_snapshot.empty:
+        with bot_col2:
+            st.markdown("#### 📋 Registro Detallado")
             styled_df = df_snapshot.iloc[::-1].style.apply(row_style, axis=1)
-            st.dataframe(styled_df, width="stretch", height=500)
-        else:
-            st.dataframe(df_snapshot, width="stretch", height=500)
+            st.dataframe(styled_df, width="stretch", height=350)
+            
+    else:
+        st.info("Esperando que los dispositivos se conecten y generen tráfico...")
 
 with tab2:
-    st.subheader("🔎 Rastreo de Actividad por IP")
+    st.markdown("### 🔎 Inspeccionar un Dispositivo Específico")
+    
     if not df_snapshot.empty:
+        # Buscador de IP
+        col_busqueda, _ = st.columns([1, 2])
+        with col_busqueda:
+            ip_buscada = st.text_input("🔍 Escribe la IP para filtrar (Ej. 192.168.1.15):", "")
+
         riesgos_mask = df_snapshot['Riesgo'].fillna('')
-        malicious_ips = df_snapshot[riesgos_mask.str.contains('Crítico')]['Origen'].unique()
-        medium_ips = df_snapshot[riesgos_mask.str.contains('Medio')]['Origen'].unique()
+        malicious_ips = df_snapshot[riesgos_mask.str.contains('Peligro')]['Origen'].unique()
+        medium_ips = df_snapshot[riesgos_mask.str.contains('Precaución')]['Origen'].unique()
         all_ips = df_snapshot['Origen'].unique()
         
         ips_ordenadas = list(malicious_ips)
         ips_ordenadas.extend([ip for ip in medium_ips if ip not in ips_ordenadas])
         ips_ordenadas.extend([ip for ip in all_ips if ip not in ips_ordenadas])
         
+        # Aplicar el filtro si se ingresó texto
+        if ip_buscada:
+            ips_ordenadas = [ip for ip in ips_ordenadas if ip_buscada in ip]
+            
+        if not ips_ordenadas:
+            st.warning("No se encontraron registros para esa IP.")
+
         for ip in ips_ordenadas:
             is_malicious = ip in malicious_ips
             is_medium = ip in medium_ips
             
             if is_malicious:
-                expander_label = f"🔴 Acciones de la IP: {ip} (RIESGO CRÍTICO DETECTADO)"
+                expander_label = f"🔴 Dispositivo: {ip} (¡PELIGRO DETECTADO!)"
             elif is_medium:
-                expander_label = f"🟠 Acciones de la IP: {ip} (RIESGO MEDIO)"
+                expander_label = f"🟠 Dispositivo: {ip} (Precaución)"
             else:
-                expander_label = f"📍 Acciones de la IP: {ip}"
+                expander_label = f"🟢 Dispositivo: {ip} (Seguro)"
             
             with st.expander(expander_label):
                 filtered_data = df_snapshot[df_snapshot['Origen'] == ip]
-                styled_filtered_df = filtered_data.iloc[::-1].style.apply(row_style, axis=1)
+                
+                resumen_col1, resumen_col2 = st.columns(2)
+                resumen_col1.metric("Total de conexiones", len(filtered_data))
+                resumen_col2.metric("Nivel de Riesgo", "Alto" if is_malicious else "Medio" if is_medium else "Bajo")
+                
+                columnas_limpias = filtered_data[['Timestamp', 'Destino', 'Tipo', 'Detalle', 'Riesgo']]
+                styled_filtered_df = columnas_limpias.iloc[::-1].style.apply(row_style, axis=1)
                 st.dataframe(styled_filtered_df, width="stretch")
     else:
-        st.info("Esperando captura de paquetes...")
+        st.info("Aún no hay información de dispositivos recolectada.")
 
 with tab3:
-    st.subheader("🦠 Base de Datos de Amenazas Recientes (URLhaus)")
+    st.markdown("### 🦠 Base de Datos de Enlaces Peligrosos")
+    st.markdown("El escudo utiliza esta lista mundial y actualizada en tiempo real para bloquear sitios web fraudulentos.")
+    
     df_urlhaus, error_msg = load_urlhaus_db()
     if not df_urlhaus.empty:
         st.dataframe(df_urlhaus, width="stretch", height=600)
     else:
         if error_msg:
-            st.error(f"Error detectado: {error_msg}")
+            st.error(f"Error de conexión con la lista de seguridad: {error_msg}")
         else:
-            st.warning("Cargando datos de URLhaus o no hay conexión disponible...")
+            st.warning("Cargando la base de datos de amenazas mundiales...")
 
 time.sleep(4)
 st.rerun()
